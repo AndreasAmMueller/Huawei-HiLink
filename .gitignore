@@ -1,0 +1,13 @@
+# Editors
+*.swp
+*.*~
+
+# Mac OS X
+._*
+Icon
+.*Trashes
+.fseventsd
+.*DS_Store
+.LSOverride
+.AppleDouble
+.Spotlight-V100
