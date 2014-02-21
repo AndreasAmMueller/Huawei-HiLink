@@ -11,6 +11,7 @@
  * with an HiLink Webinterface (e.g. Huawei E303)
  **/
 
+@error_reporting(E_ALL ^ E_NOTICE);
 
 /* ---                     DEPENDENCIES                           ---
 ------------------------------------------------------------------ */
@@ -21,6 +22,8 @@ function_exists('simplexml_load_string') or die('simplexml needed'.PHP_EOL);
 class HiLink {
 	// Class Attributes
 	private $host, $ipcheck;
+
+	public $trafficStats, $monitor;
 
 	public function __construct() {
 		$this->setHost('192.168.1.1');
@@ -96,14 +99,200 @@ class HiLink {
 	/* --- Traffic Statistics
 	------------------------- */
 	public function getTrafficStatistic() {
+		$stats = $this->trafficStats;
+
+		if (isset($stats->UpdateTime) && ($stats->UpdateTime + 3) > time()) {
+			return $stats;
+		}
+		
 		$ch = curl_init($this->host.'/api/monitoring/traffic-statistics');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		$res = curl_exec($ch);
 		curl_close($ch);
 
-		return simplexml_load_string($res);
+		$stats = simplexml_load_string($res);
+		$stats->UpdateTime = time();
+		$this->trafficStats = $stats;
+		return $stats;
+	}
+
+	// Online Time
+	public function getOnlineTime() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getTime($stats->CurrentConnectTime);
+	}
+
+	public function getTotalOnlineTime() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getTime($stats->TotalConnectTime);
+	}
+
+	// Upload
+	public function getTotalUpload() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->TotalUpload);
+	}
+
+	public function getCurrentUpload() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->CurrentUpload);
+	}
+
+	public function getUploadRate() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->CurrentUploadRate).'/s';
+	}
+
+	// Download
+	public function getTotalDownload() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->TotalDownload);
+	}
+
+	public function getCurrentDownload() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->CurrentDownload);
+	}
+
+	public function getDownloadRate() {
+		$stats = $this->getTrafficStatistic();
+		return $this->getData($stats->CurrentDownloadRate).'/s';
+	}
+
+	// collected output
+	public function getTraffic($asArray = false) {
+		if ($asArray) {
+			return array(
+			"timeCurrent"     => $this->getOnlineTime(),
+			"timeTotal"       => $this->getTotalOnlineTime(),
+			"uploadTotal"     => $this->getTotalUpload(),
+			"uploadCurrent"   => $this->getCurrentUpload(),
+			"uploadRate"      => $this->getUploadRate(),
+			"downloadTotal"   => $this->getTotalDownload(),
+			"downloadCurrent" => $this->getCurrentDownload(),
+			"downluadRate"    => $this->getDownloadRate()
+			);
+		} else {
+			$ret = '';
+			// current
+			$ret .= "Current Session:".PHP_EOL;
+			$ret .= "- Time:     ".$this->getOnlineTime().PHP_EOL;
+			$ret .= "- Upload:   ".$this->getCurrentUpload();
+			$ret .= " [".$this->getUploadRate()."]";
+			$ret .= PHP_EOL;
+			$ret .= "- Download: ".$this->getCurrentDownload();
+			$ret .= " [".$this->getDownloadRate()."]";
+			$ret .= PHP_EOL;
+			// total
+			$ret .= "Total Data:".PHP_EOL;
+			$ret .= "- Time:     ".$this->getTotalOnlineTime().PHP_EOL;
+			$ret .= "- Upload:   ".$this->getTotalUpload().PHP_EOL;
+			$ret .= "- Download: ".$this->getTotalDownload().PHP_EOL;
+			return $ret;
+		}
+	}
+	public function printTraffic() {
+		echo $this->getTraffic();
 	}
 	
+	public function resetTrafficStats() {
+		$ch = curl_init($this->host.'/api/monitoring/clear-traffic');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => "<request><ClearTraffic>1</ClearTraffic></request>"
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+		
+		$res = simplexml_load_string($ret);
+		return ($res->response == "OK");
+	}
+
+	/* --- Provider
+	--------------- */
+	public function getProvider($length = 'full') {
+		$ch = curl_init($this->host.'/api/net/current-plmn');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+		$res = simplexml_load_string($ret);
+
+		switch ($length) {
+			case 'full': return $res->FullName; break;
+			case 'short': return $res->ShortName; break;
+			default: return $res->Numeric; break;
+		}
+	}
+
+	/* --- Monitoring Stats
+	----------------------- */
+	public function getMonitor() {
+		$monitor = $this->monitor;
+		if (isset($monitor->UpdateTime) && ($monitor->UpdateTime + 3) > time()) {
+			return $monitor;
+		}
+		
+		$ch = curl_init($this->host.'/api/monitoring/status');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$res = curl_exec($ch);
+		curl_close($ch);
+
+		$monitor = simplexml_load_string($res);
+		$monitor->UpdateTime = time();
+		$this->monitor = $monitor;
+		return $monitor;
+	}
+
+	// connection status
+	public function getConnectionStatus() {
+		$mon = $this->getMonitor();
+		switch ($mon->ConnectionStatus) {
+			case "112": return "No autoconnect";
+			case "113": return "No autoconnect (roaming)";
+			case "114": return "No reconnect on timeout";
+			case "115": return "No reconnect on timeout (roaming)";
+			case "900": return "Connecting";
+			case "901": return "Connected";
+			case "902": return "Disconnected";
+			case "903": return "Disconnecting";
+			default: return "Unknown status";
+		}
+	}
+
+	// connection type
+	public function getConnectionType() {
+		$mon = $this->getMonitor();
+		switch ($mon->CurrentNetworkType) {
+			case "3": return "2G";
+			case "4": return "3G";
+			case "7": return "3G+";
+			default: return "Unknown type";
+		}
+	}
+
+	public function setConnectionType($type = 'auto', $band = '-1599903692') {
+		$type = strtolower($type);
+		switch ($type) {
+			case '2g': $req = "<request><NetworkMode>1</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
+			case '3g': $req = "<request><NetworkMode>2</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
+			default:   $req = "<request><NetworkMode>0</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
+		}
+
+		$ch = curl_init($this->host.'/api/net/network');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res->response == "OK");
+	}
 
 
 
@@ -118,6 +307,39 @@ class HiLink {
 
 
 
+
+
+	// collected output
+	public function getStatus($asArray = false) {
+		if ($asArray) {
+			return array(
+//			"status"    => $this->getSysStatus(),
+//			"roaming"   => $this->getRoaming(),
+			"conStatus" => $this->getConnectionStatus(),
+			"conType"   => $this->getConnectionType(),
+//			"conStr"    => $this->getConStrength(),
+			"ipProv"    => $this->getProvider(),
+			"ipExt"     => $this->getExternalIp(),
+//			"ipDNS1"    => $this->getIPv4DNS(1),
+//			"ipDNS2"    => $this->getIPv4DNS(2)
+			);
+		} else {
+			$out = "";
+//			$out .= "System-Status:       ".$this->getSysStatus().PHP_EOL;
+//			$out .= "Roaming:             ".$this->getRoaming().PHP_EOL;
+			$out .= "Connection-Status:   ".$this->getConnectionStatus().PHP_EOL;
+			$out .= "Connection-Type:     ".$this->getConnectionType().PHP_EOL;
+//			$out .= "Connection-Strength: ".$this->getConStrength().PHP_EOL;
+			$out .= "PIv4 - Provider:     ".$this->getProvider().PHP_EOL;
+			$out .= "IPv4 - external:     ".$this->getExternalIp().PHP_EOL;
+//			$out .= "IPv4 - DNS (1):      ".$this->getIPv4DNS(1).PHP_EOL;
+//			$out .= "IPv4 - DNS (2):      ".$this->getIPv4DNS(2).PHP_EOL;
+			return $out;
+		}
+	}
+	public function printStatus() {
+		echo $this->getStatus();
+	}
 
 
 
@@ -138,9 +360,9 @@ class HiLink {
 		$m = floor($time/60) - $h*60;
 		$s = $time - ($h*3600 + $m*60);
 
-		if ($h > 10) $h = '0'.$h;
-		if ($m > 10) $m = '0'.$m;
-		if ($s > 10) $s = '0'.$s;
+		if ($h < 10) $h = '0'.$h;
+		if ($m < 10) $m = '0'.$m;
+		if ($s < 10) $s = '0'.$s;
 
 		return $h.':'.$m.':'.$s;
 	}
