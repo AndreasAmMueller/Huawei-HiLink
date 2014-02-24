@@ -23,7 +23,7 @@ class HiLink {
 	// Class Attributes
 	private $host, $ipcheck;
 
-	public $trafficStats, $monitor;
+	public $trafficStats, $monitor, $device;
 
 	public function __construct() {
 		$this->setHost('192.168.1.1');
@@ -207,7 +207,7 @@ class HiLink {
 		curl_close($ch);
 		
 		$res = simplexml_load_string($ret);
-		return ($res->response == "OK");
+		return ($res[0] == "OK");
 	}
 
 	/* --- Provider
@@ -245,6 +245,22 @@ class HiLink {
 		return $monitor;
 	}
 
+	// IP provider
+	public function getProviderIp() {
+		$mon = $this->getMonitor();
+		return $mon->WanIPAddress;
+	}
+
+	// get DNS server
+	public function getDnsServer($server = 1) {
+		$mon = $this->getMonitor();
+		if ($server == 2) {
+			return $mon->SecondaryDns;
+		} else {
+			return $mon->PrimaryDns;
+		}
+	}
+
 	// connection status
 	public function getConnectionStatus() {
 		$mon = $this->getMonitor();
@@ -271,75 +287,368 @@ class HiLink {
 			default: return "Unknown type";
 		}
 	}
-
 	public function setConnectionType($type = 'auto', $band = '-1599903692') {
 		$type = strtolower($type);
+		$req = new SimpleXMLElement('<request></request>');
 		switch ($type) {
-			case '2g': $req = "<request><NetworkMode>1</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
-			case '3g': $req = "<request><NetworkMode>2</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
-			default:   $req = "<request><NetworkMode>0</NetworkMode><NetworkBand>$band</NetworkBand></request>"; break;
+			case '2g': $req->addChild('NetworkMode', 1); break;
+			case '3g': $req->addChild('NetworkMode', 2); break;
+			default:   $req->addChild('NetworkMode', 0); break;
 		}
+		$req->addChild('NetworkBand', $band);
 
 		$ch = curl_init($this->host.'/api/net/network');
 		$opts = array(
 			CURLOPT_RETURNTRANSFER => 1,
 			CURLOPT_POST => 1,
-			CURLOPT_POSTFIELDS => $req
+			CURLOPT_POSTFIELDS => $req->asXML(),
 		);
 		curl_setopt_array($ch, $opts);
 		$ret = curl_exec($ch);
 		curl_close($ch);
 
 		$res = simplexml_load_string($ret);
-		return ($res->response == "OK");
+		return ($res[0] == "OK");
 	}
 
+	// signal strength
+	public function getSignalStrength() {
+		$mon = $this->getMonitor();
+		return $mon->SignalStrength.'%';
+	}
 
+	// SIM
+	public function getSimStatus() {
+		$mon = $this->getMonitor();
+		if ($mon->SimStatus == 1) {
+			return "SIM ok";
+		} else {
+			return "SIM fail";
+		}
+	}
 
+	public function getServiceStatus() {
+		$mon = $this->getMonitor();
+		if ($mon->ServiceStatus == 2) {
+			return "PIN ok";
+		} else {
+			return "enter PIN";
+		}
+	}
 
+	public function getSystemStatus() {
+		return $this->getSimStatus().' ['.$this->getServiceStatus().']';
+	}
 
+	// roaming
+	public function getRoamingStatus() {
+		$mon = $this->getMonitor();
+		switch ($mon->RoamingStatus) {
+			case 0: return "inactive";
+			case 1: return "active";
+			default: return "unknown";
+		}
+	}
 
+	public function activateRoaming() {
+		if ($this->getRoamingStatus() == 'active')
+				return true;
 
+		return false;
+		// TODO: write action
+	}
 
+	public function deactivateRoaming() {
+		if ($this->getRoamingStatus() == 'inactive')
+				return true;
 
-
-
-
-
-
-
+		return false;
+		// TODO: write action
+	}
 
 	// collected output
 	public function getStatus($asArray = false) {
 		if ($asArray) {
 			return array(
-//			"status"    => $this->getSysStatus(),
-//			"roaming"   => $this->getRoaming(),
+			"status"    => $this->getSystemStatus(),
+			"roaming"   => $this->getRoamingStatus(),
 			"conStatus" => $this->getConnectionStatus(),
 			"conType"   => $this->getConnectionType(),
-//			"conStr"    => $this->getConStrength(),
-			"ipProv"    => $this->getProvider(),
+			"sigStr"    => $this->getSignalStrength(),
+			"ipProv"    => $this->getProviderIp(),
 			"ipExt"     => $this->getExternalIp(),
-//			"ipDNS1"    => $this->getIPv4DNS(1),
-//			"ipDNS2"    => $this->getIPv4DNS(2)
+			"ipDNS1"    => $this->getDnsServer(),
+			"ipDNS2"    => $this->getDnsServer(2)
 			);
 		} else {
 			$out = "";
-//			$out .= "System-Status:       ".$this->getSysStatus().PHP_EOL;
-//			$out .= "Roaming:             ".$this->getRoaming().PHP_EOL;
-			$out .= "Connection-Status:   ".$this->getConnectionStatus().PHP_EOL;
+			$out .= "System-Status:       ".$this->getSystemStatus().PHP_EOL;
+			$out .= "Roaming:             ".$this->getRoamingStatus().PHP_EOL;
+			$out .= "Connection-)tatus:   ".$this->getConnectionStatus().PHP_EOL;
 			$out .= "Connection-Type:     ".$this->getConnectionType().PHP_EOL;
-//			$out .= "Connection-Strength: ".$this->getConStrength().PHP_EOL;
-			$out .= "PIv4 - Provider:     ".$this->getProvider().PHP_EOL;
+			$out .= "Connection-Strength: ".$this->getSignalStrength().PHP_EOL;
+			$out .= "IPv4 - Provider:     ".$this->getProviderIp().PHP_EOL;
 			$out .= "IPv4 - external:     ".$this->getExternalIp().PHP_EOL;
-//			$out .= "IPv4 - DNS (1):      ".$this->getIPv4DNS(1).PHP_EOL;
-//			$out .= "IPv4 - DNS (2):      ".$this->getIPv4DNS(2).PHP_EOL;
+			$out .= "IPv4 - DNS (1):      ".$this->getDnsServer().PHP_EOL;
+			$out .= "IPv4 - DNS (2):      ".$this->getDnsServer(2).PHP_EOL;
 			return $out;
 		}
 	}
 	public function printStatus() {
 		echo $this->getStatus();
 	}
+
+	/* --- PIN actions
+	------------------ */
+	public function getPin() {
+		$ch = curl_init($this->host.'/api/pin/status');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return $res;
+	}
+
+	private function pinDo($type, $pin, $new = '', $puk = '') {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('OperateType', $type);
+		$req->addChild('CurrentPin', $pin);
+		$req->addChild('NewPin', $new);
+		$req->addChild('PukCode', $puk);
+
+		$ch = curl_init($this->host.'/api/pin/operate');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res[0] == "OK");
+	}
+
+	public function pinEnter($pin) {
+		return $this->pinDo(0, $pin);
+	}
+
+	public function pinActivate($pin) {
+		return $this->pinDo(1, $pin);
+	}
+
+	public function pinDeactivate($pin) {
+		return $this->pinDo(2, $pin);
+	}
+
+	public function pinChange($pin, $new) {
+		return $this->pinDo(3, $pin, $new);
+	}
+
+	public function pinEnterPuk($puk, $newPin) {
+		return $this->pinDo(4, $newPin, $newPin, $puk);
+	}
+
+	public function getPinTryLeft() {
+		$st = $this->getPin();
+		return $st->SimPinTimes;
+	}
+
+	public function getPukTryLeft() {
+		$st = $this->getPin();
+		return $st->SimPukTimes;
+	}
+
+	public function getPinStatus($asArray = false) {
+		$st = $this->getPin();
+		if ($asArray) {
+			return array(
+				"pinTry" => $st->SimPinTimes,
+				"pukTry" => $st->SimPukTimes,
+			);
+		} else {
+			$out = '';
+			$out .= 'PIN Tries Left: '.$st->SimPinTimes.PHP_EOL;
+			$out .= 'PUK Tries Left: '.$st->SimPukTimes.PHP_EOL;
+			return $out;
+		}
+	}
+
+	public function printPinStatus() {
+		echo $this->getPinStatus();
+	}
+
+	/* --- Connection
+	----------------- */
+	public function connect() {
+		if ($this->isConnected())
+				return true;
+
+		$ch = curl_init($this->host.'/api/dialup/dial');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => "<request><Action>1</Action></request>",
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == 'OK');
+	}
+
+	public function disconnect() {
+		if (!$this->isConnected())
+				return true;
+
+		$ch = curl_init($this->host.'/api/dialup/dial');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => "<request><Action>0</Action></request>",
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == 'OK');
+	}
+
+	public function isConnected() {
+		$st = $this->getConnectionStatus();
+		return ($st == 'Connected');
+	}
+
+	/* --- Device Infos
+	------------------- */
+	public function getDevice() {
+		$device = $this->device;
+		if (isset($device->UpdateTime) && ($device->UpdateTime + 3) > time()) {
+			return $device;
+		}
+		
+		$ch = curl_init($this->host.'/api/device/information');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$res = curl_exec($ch);
+		curl_close($ch);
+
+		$device = simplexml_load_string($res);
+		$device->UpdateTime = time();
+		$this->device = $device;
+		return $device;
+	}
+
+	public function getDeviceName() {
+		$dev = $this->getDevice();
+		return $dev->DeviceName;
+	}
+
+	public function getSerialNumber() {
+		$dev = $this->getDevice();
+		return $dev->SerialNumber;
+	}
+
+	public function getIMEI() {
+		$dev = $this->getDevice();
+		return $dev->Imei;
+	}
+
+	public function getIMSI() {
+		$dev = $this->device;
+		return $dev->Imsi;
+	}
+
+	public function getICCID() {
+		$dev = $this->getDevice();
+		return $dev->Iccid;
+	}
+
+	public function getPhoneNumber() {
+		$dev = $this->getDevice();
+		return $dev->Msisdn;
+	}
+
+	public function getHardwareVersion() {
+		$dev = $this->getDevice();
+		return $dev->HardwareVersion;
+	}
+
+	public function getSoftwareVersion() {
+		$dev = $this->getDevice();
+		return $dev->SoftwareVersion;
+	}
+
+	public function getGuiVersion() {
+		$dev = $this->getDevice();
+		return $dev->WebUIVersion;
+	}
+
+	public function getUptime() {
+		$dev = $this->getDevice();
+		return $this->getTime($dev->Uptime);
+	}
+
+	public function getMAC($interface = 1) {
+		$dev = $this->getDevice();
+		if ($interface == 2) {
+			return $dev->MacAddress2;
+		} else {
+			return $dev->MacAddress1;
+		}
+	}
+
+	public function getDeviceInfo($asArray = false) {
+		if ($asArray) {
+			return array(
+				"name"   => $this->getDeviceName(),
+				"sn"     => $this->getSerialNumber(),
+				"imei"   => $this->getIMEI(),
+				"imsi"   => $this->getIMSI(),
+				"iccid"  => $this->getICCID(),
+				"number" => $this->getPhoneNumber(),
+				"hw"     => $this->getHardwareVersion(),
+				"sw"     => $this->getSoftwareVersion(),
+				"ui"     => $this->getGuiVersion(),
+				"uptime" => $this->getUptime(),
+				"mac"    => $this->getMAC(),
+			);
+		} else {
+			$out = "";
+			$out .= "Name:         ".$this->getDeviceName().PHP_EOL;
+			$out .= "SerialNo:     ".$this->getSerialNumber().PHP_EOL;
+			$out .= "IMEI:         ".$this->getIMEI().PHP_EOL;
+			$out .= "IMSI:         ".$this->getIMSI().PHP_EOL;
+			$out .= "ICCID:        ".$this->getICCID().PHP_EOL;
+			$out .= "Phone Number: ".$this->getPhoneNumber().PHP_EOL;
+			$out .= "HW Version:   ".$this->getHardwareVersion().PHP_EOL;
+			$out .= "SW Version:   ".$this->getSoftwareVersion().PHP_EOL;
+			$out .= "UI Version:   ".$this->getGuiVersion().PHP_EOL;
+			$out .= "Uptime:       ".$this->getUptime().PHP_EOL;
+			$out .= "MAC:          ".$this->getMAC().PHP_EOL;
+			return $out;
+		}
+	}
+
+	public function printDeviceInfo() {
+		echo $this->getDeviceInfo();
+	}
+
+	/* --- SMS
+	---------- */
+	public function getSmsList() {
+		// TODO: hier gehts weiter...
+	}
+
+
+
+
+
 
 
 
