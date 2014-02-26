@@ -8,7 +8,10 @@
  *
  * @description
  * This class tries to fully control an UMTS Stick from Huawei
- * with an HiLink Webinterface (e.g. Huawei E303)
+ * with an HiLink Webinterface
+ *
+ * functionality tested with Huawei E303
+ * Link: http://www.huaweidevices.de/e303
  **/
 
 @error_reporting(E_ALL ^ E_NOTICE);
@@ -350,22 +353,6 @@ class HiLink {
 		}
 	}
 
-	public function activateRoaming() {
-		if ($this->getRoamingStatus() == 'active')
-				return true;
-
-		return false;
-		// TODO: write action
-	}
-
-	public function deactivateRoaming() {
-		if ($this->getRoamingStatus() == 'inactive')
-				return true;
-
-		return false;
-		// TODO: write action
-	}
-
 	// collected output
 	public function getStatus($asArray = false) {
 		if ($asArray) {
@@ -525,6 +512,103 @@ class HiLink {
 		return ($st == 'Connected');
 	}
 
+	public function getConnection($asArray = false) {
+		$ch = curl_init($this->host.'/api/dialup/connection');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+		$res = simplexml_load_string($ret);
+
+		if ($asArray) {
+			return array(
+				"ConnectMode"          => $res->ConnectMode,
+				"AutoReconnect"        => $res->AutoReconnect,
+				"RoamingAutoConnect"   => $res->RoamAutoConnectEnable,
+				"RoamingAutoReconnect" => $res->RoamAutoReconnctEnable,
+				"ReconnectInterval"    => $res->ReconnectInterval,
+				"MaxIdleTime"          => $res->MaxIdelTime,
+			);
+		} else {
+			$out = '';
+			$out .= "Auto Connect:           ".(($res->ConnectMode == 0) ? "1" : "0").PHP_EOL;
+			$out .= "Auto Reconnect:         ".$res->AutoReconnect.PHP_EOL;
+			$out .= "Roaming Auto Connect:   ".$res->RoamAutoConnectEnable.PHP_EOL;
+			$out .= "Roaming Auto Reconnect: ".$res->RoamAutoReconnctEnable.PHP_EOL;
+			$out .= "Reconnect Interval:     ".$res->ReconnectInterval.PHP_EOL;
+			$out .= "Max. Idle Time:         ".$res->MaxIdelTime.PHP_EOL;
+			return $out;
+		}
+	}
+	public function printConnection() {
+		echo $this->getConnection();
+	}
+
+	private function doConnection($autoconnect, $reconnect, $roamingauto, $roamingre, $interval = 3, $idle = 0) {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('RoamAutoConnectEnable', $roamingauto);
+		$req->addChild('AutoReconnect', $reconnect);
+		$req->addChild('RoamAutoReconnctEnable', $roamingre);
+		$req->addChild('ReconnectInterval', $interval);
+		$req->addChild('MaxIdelTime', $idle);
+		$req->addChild('ConnectMode', $autoconnect);
+
+		$ch = curl_init($this->host.'/api/dialup/connection');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == "OK");
+	}
+
+	public function activateAutoconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection(0, $get['AutoReconnect'], $get['RoamingAutoConnect'], $get['RoamingAutoReconnect']);
+	}
+	public function deactivateAutoconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection(1, $get['AutoReconnect'], $get['RoamingAutoConnect'], $get['RoamingAutoReconnect']);
+	}
+
+	public function activateAutoReconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], 1, $get['RoamingAutoConnect'], $get['RoamingAutoReconnect']);
+	}
+	public function deactivateAutoReconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], 0, $get['RoamingAutoConnect'], $get['RoamingAutoReconnect']);
+	}
+
+	public function activateRoamingAutoconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], $get['AutoReconnect'], 1, $get['RoamingAutoReconnect']);
+	}
+	public function deactivateRoamingAutoconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], $get['AutoReconnect'], 0, $get['RoamingAutoReconnect']);
+	}
+
+	public function activateRoamingAutoReconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], $get['AutoReconnect'], $get['RoamingAutoConnect'], 1);
+	}
+
+	public function deactivateRoamingAutoReconnect() {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], $get['AutoReconnect'], $get['RoamingAutoConnect'], 0);
+	}
+
+	public function setReconnectInterval($seconds) {
+		$get = $this->getConnection(true);
+		return $this->doConnection($get['ConnectMode'], $get['AutoReconnect'], $get['RoamingAutoConnect'], $get['RoamingAutoReconnect'], $seconds);
+	}
+
 	/* --- Device Infos
 	------------------- */
 	public function getDevice() {
@@ -637,6 +721,164 @@ class HiLink {
 
 	public function printDeviceInfo() {
 		echo $this->getDeviceInfo();
+	}
+
+	/* --- APN
+	---------- */
+	public function getApn() {
+		$ch = curl_init($this->host.'/api/dialup/profiles');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		return simplexml_load_string($ret);
+	}
+
+	public function createProfile($name, $apn, $user, $password, 
+			$isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0, 
+			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('Delete', 0);
+		$req->addChild('SetDefault', 0);
+		$req->addChild('Modify', 1);
+		$p = $req->addChild('Profile');
+		$p->addChild('Index');
+		$p->addChild('IsValid', $isValid);
+		$p->addChild('Name', $name);
+		$p->addChild('ApnIsStatic', $apnIsStatic);
+		$p->addChild('ApnName', $apn);
+		$p->addChild('DailupNum', $dailupNum);
+		$p->addChild('Username', $user);
+		$p->addChild('Password', $password);
+		$p->addChild('AuthMode', $authMode);
+		$p->addChild('IpIsStatic', $ipIsStatic);
+		$p->addChild('IpAddress', $ipAddress);
+		$p->addChild('DnsIsStatic', $dnsIsStatic);
+		$p->addChild('PrimaryDns', $primarayDns);
+		$p->addChild('SecondaryDns', $secondaryDns);
+		$p->addChild('ReadOnly', 0);
+
+		$ch = curl_init($this->host.'/api/dialup/profiles');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res[0] == "OK");
+	}
+
+	public function editProfile($idx, $name, $apn, $user, $password, 
+			$readOnly = 0, $isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0, 
+			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('Delete', 0);
+		$req->addChild('SetDefault', $idx);
+		$req->addChild('Modify', 2);
+		$p = $req->addChild('Profile');
+		$p->addChild('Index', $idx);
+		$p->addChild('IsValid', $isValid);
+		$p->addChild('Name', $name);
+		$p->addChild('ApnIsStatic', $apnIsStatic);
+		$p->addChild('ApnName', $apn);
+		$p->addChild('DailupNum', $dailupNum);
+		$p->addChild('Username', $user);
+		$p->addChild('Password', $password);
+		$p->addChild('AuthMode', $authMode);
+		$p->addChild('IpIsStatic', $ipIsStatic);
+		$p->addChild('IpAddress', $ipAddress);
+		$p->addChild('DnsIsStatic', $dnsIsStatic);
+		$p->addChild('PrimaryDns', $primarayDns);
+		$p->addChild('SecondaryDns', $secondaryDns);
+		$p->addChild('ReadOnly', $readOnly);
+
+		$ch = curl_init($this->host.'/api/dialup/profiles');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res[0] == "OK");
+	}
+
+	public function setProfileDefault($idx) {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('Delete', 0);
+		$req->addChild('SetDefault', $idx);
+		$req->addChild('Modify', 0);
+
+		$ch = curl_init($this->host.'/api/dialup/profiles');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res[0] == "OK");
+	}
+
+	public function deleteProfile($idx) {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('Delete', $idx);
+		$req->addChild('SetDefault', 1);
+		$req->addChild('Modify', 0);
+
+		$ch = curl_init($this->host.'/api/dialup/profiles');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+		return ($res[0] == "OK");
+	}
+
+	public function listApn($asArray = false) {
+		$apn = $this->getApn();
+		$p = $apn->Profiles->Profile;
+		$res = array();
+
+		for ($i = 0; $i < count($p); ++$i) {
+			$ar = array();
+			$ar['idx']  = $p[$i]->Index;
+			$ar['name'] = $p[$i]->Name;
+			$ar['apn']  = $p[$i]->ApnName;
+			$ar['user'] = $p[$i]->Username;
+			$ar['pass'] = $p[$i]->Password;
+
+			$res[] = $ar;
+		}
+
+		if ($asArray)
+				return $res;
+
+		$out = 'Index: Name [APN] - User:Password'.PHP_EOL;
+		$out.= '---------------------------------'.PHP_EOL;
+		foreach ($res as $line) {
+			$out .= $line['idx'].': '.$line['name'].' ['.$line['apn'].'] - '.$line['user'].':'.$line['pass'].PHP_EOL;
+		}
+		return $out;
+	}
+
+	public function printApn() {
+		echo $this->listApn();
 	}
 
 	/* --- SMS
