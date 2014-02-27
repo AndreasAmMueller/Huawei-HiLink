@@ -14,7 +14,7 @@
  * Link: http://www.huaweidevices.de/e303
  **/
 
-@error_reporting(E_ALL ^ E_NOTICE);
+@error_reporting(0);
 
 /* ---                     DEPENDENCIES                           ---
 ------------------------------------------------------------------ */
@@ -1096,7 +1096,7 @@ class HiLink {
 		$req->addChild('Reserved', 1);
 		$req->addChild('Date', date('Y-m-d H:i:s'));
 
-		return true;  // backup return to prohibit high costs
+//		return true;  // backup return to prohibit high costs
 
 		$ch = curl_init($this->host.'/api/sms/send-sms');
 		$opts = array(
