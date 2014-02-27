@@ -107,7 +107,7 @@ class HiLink {
 		if (isset($stats->UpdateTime) && ($stats->UpdateTime + 3) > time()) {
 			return $stats;
 		}
-		
+
 		$ch = curl_init($this->host.'/api/monitoring/traffic-statistics');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		$res = curl_exec($ch);
@@ -173,7 +173,7 @@ class HiLink {
 			"uploadRate"      => $this->getUploadRate(),
 			"downloadTotal"   => $this->getTotalDownload(),
 			"downloadCurrent" => $this->getCurrentDownload(),
-			"downluadRate"    => $this->getDownloadRate()
+			"downloadRate"    => $this->getDownloadRate()
 			);
 		} else {
 			$ret = '';
@@ -223,9 +223,9 @@ class HiLink {
 		$res = simplexml_load_string($ret);
 
 		switch ($length) {
-			case 'full': return $res->FullName; break;
-			case 'short': return $res->ShortName; break;
-			default: return $res->Numeric; break;
+			case 'full': return ''.$res->FullName; break;
+			case 'short': return ''.$res->ShortName; break;
+			default: return ''.$res->Numeric; break;
 		}
 	}
 
@@ -251,16 +251,16 @@ class HiLink {
 	// IP provider
 	public function getProviderIp() {
 		$mon = $this->getMonitor();
-		return $mon->WanIPAddress;
+		return ''.$mon->WanIPAddress;
 	}
 
 	// get DNS server
 	public function getDnsServer($server = 1) {
 		$mon = $this->getMonitor();
 		if ($server == 2) {
-			return $mon->SecondaryDns;
+			return ''.$mon->SecondaryDns;
 		} else {
-			return $mon->PrimaryDns;
+			return ''.$mon->PrimaryDns;
 		}
 	}
 
@@ -630,47 +630,47 @@ class HiLink {
 
 	public function getDeviceName() {
 		$dev = $this->getDevice();
-		return $dev->DeviceName;
+		return ''.$dev->DeviceName;
 	}
 
 	public function getSerialNumber() {
 		$dev = $this->getDevice();
-		return $dev->SerialNumber;
+		return ''.$dev->SerialNumber;
 	}
 
 	public function getIMEI() {
 		$dev = $this->getDevice();
-		return $dev->Imei;
+		return ''.$dev->Imei;
 	}
 
 	public function getIMSI() {
 		$dev = $this->device;
-		return $dev->Imsi;
+		return ''.$dev->Imsi;
 	}
 
 	public function getICCID() {
 		$dev = $this->getDevice();
-		return $dev->Iccid;
+		return ''.$dev->Iccid;
 	}
 
 	public function getPhoneNumber() {
 		$dev = $this->getDevice();
-		return $dev->Msisdn;
+		return ''.$dev->Msisdn;
 	}
 
 	public function getHardwareVersion() {
 		$dev = $this->getDevice();
-		return $dev->HardwareVersion;
+		return ''.$dev->HardwareVersion;
 	}
 
 	public function getSoftwareVersion() {
 		$dev = $this->getDevice();
-		return $dev->SoftwareVersion;
+		return ''.$dev->SoftwareVersion;
 	}
 
 	public function getGuiVersion() {
 		$dev = $this->getDevice();
-		return $dev->WebUIVersion;
+		return ''.$dev->WebUIVersion;
 	}
 
 	public function getUptime() {
@@ -681,9 +681,9 @@ class HiLink {
 	public function getMAC($interface = 1) {
 		$dev = $this->getDevice();
 		if ($interface == 2) {
-			return $dev->MacAddress2;
+			return ''.$dev->MacAddress2;
 		} else {
-			return $dev->MacAddress1;
+			return ''.$dev->MacAddress1;
 		}
 	}
 
