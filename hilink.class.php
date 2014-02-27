@@ -857,11 +857,11 @@ class HiLink {
 
 		for ($i = 0; $i < count($p); ++$i) {
 			$ar = array();
-			$ar['idx']  = $p[$i]->Index;
-			$ar['name'] = $p[$i]->Name;
-			$ar['apn']  = $p[$i]->ApnName;
-			$ar['user'] = $p[$i]->Username;
-			$ar['pass'] = $p[$i]->Password;
+			$ar['idx']  = ''.$p[$i]->Index;
+			$ar['name'] = ''.$p[$i]->Name;
+			$ar['apn']  = ''.$p[$i]->ApnName;
+			$ar['user'] = ''.$p[$i]->Username;
+			$ar['pass'] = ''.$p[$i]->Password;
 
 			$res[] = $ar;
 		}
@@ -883,17 +883,246 @@ class HiLink {
 
 	/* --- SMS
 	---------- */
-	public function getSmsList() {
-		// TODO: hier gehts weiter...
+	public function getSms($box = 1, $site = 1, $prefUnread = 0, $count = 20) {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('PageIndex', $site);
+		$req->addChild('ReadCount', $count);
+		$req->addChild('BoxType', $box);
+		$req->addChild('SortType', 0);
+		$req->addChild('Ascending', 0);
+		$req->addChild('UnreadPreferred', $prefUnread);
+
+		$ch = curl_init($this->host.'/api/sms/sms-list');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		return simplexml_load_string($ret);
+	}
+
+	private function doSmsBox($box, $asArray) {
+		$box = $this->getSms($box);
+		$ret = array();
+
+		$msg = $box->Messages->Message;
+
+		for ($i = 0; $i < $box->Count; ++$i) {
+			$m = $msg[$i];
+			$ar = array();
+			$ar['idx'] = "$m->Index";
+			$ar['read'] = (($m->Smstat == 1) ? true : false);
+			$ar['number'] = "$m->Phone";
+			$ar['msg'] = "$m->Content";
+			$ar['time'] = strtotime($m->Date);
+			$ar['proxy'] = "$m->Sca";
+
+			$ret[] = $ar;
+		}
+
+		if ($asArray)
+				return $ret;
+
+		$out = '';
+		foreach ($ret as $l) {
+			$out .= $l['idx'].") ".$l['number']." - ".date('d.m.Y H:i:s').PHP_EOL;
+			$out .= "Read: ".$l['read'].PHP_EOL;
+			$out .= "Nachricht: ".$l['msg'].PHP_EOL;
+		}
+
+		return $out;
 	}
 
 
+	public function getSmsInbox($asArray = true) {
+		return $this->doSmsBox(1, $asArray);
+	}
 
+	public function getSmsOutbox($asArray = true) {
+		return $this->doSmsBox(2, $asArray);
+	}
 
+	public function getSmsDraft($asArray = true) {
+		return $this->doSmsBox(3, $asArray);
+	}
 
+	public function printSmsBox($box = 0) {
+		switch ($box) {
+			case 1: echo $this->getSmsInbox(false); break;
+			case 2: echo $this->getSmsOutbox(false); break;
+			case 3: echo $this->getSmsDraft(false); break;
+			default:
+				echo "Inbox:".PHP_EOL;
+				echo $this->getSmsInbox(false).PHP_EOL;
+				echo "Outbox:".PHP_EOL;
+				echo $this->getSmsOutbox(false).PHP_EOL;
+				echo "Draft:".PHP_EOL;
+				echo $this->getSmsDraft(false);
+				break;
+		}
+	}
 
+	public function getNotifications() {
+		$ch = curl_init($this->host.'/api/monitoring/check-notifications');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
 
+		return simplexml_load_string($ret);
+	}
 
+	public function getUnreadSms() {
+		$not = $this->getNotifications();
+		return $not->UnreadMessage;
+	}
+
+	public function smsStorageFull() {
+		$not = $this->getNotificaitons();
+		return ($not->SmsStorageFull == 0) ? false : true;
+	}
+
+	public function getSmsCount($box = 'default') {
+		$ch = curl_init($this->host.'/api/sms/sms-count');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		switch ($box) {
+			case 'in': case 'inbox': case 1:
+				return "".$res->LocalInbox;
+			case 'out': case 'outbox': case 2:
+				return "".$res->LocalOutbox;
+			case 'draft': case 'drafts': case 3:
+				return "".$res->LocalDraft;
+			case 'deleted': case 4:
+				return "".$res->localDeleted;
+			case 'unread': case 'new':
+				return "".$res->LocalUnread;
+			default:
+				return array(
+					'inbox'   => "".$res->LocalInbox,
+					'outbox'  => "".$res->LocalOutbox,
+					'draft'   => "".$res->LocalDraft,
+					'deleted' => "".$res->LocalDeleted,
+					'unread'  => "".$res->LocalUnread,
+				);
+		}
+	}
+
+	public function listUnreadSms() {
+		$list = $this->getSmsInbox();
+		$ret = array();
+		foreach ($list as $sms) {
+			if (!$sms['read']) {
+				$ret[] = $sms;
+			}
+		}
+
+		return $ret;
+	}
+
+	public function setSmsRead($idx) {
+		$req = new SimpleXMLElement('<request></request>');
+
+		if (is_array($idx)) {
+			for ($i = 0; $i < count($idx); $i++)
+					$req->addChild('Index', $idx[$i]);
+		} else {
+			$req->addChild('Index', $idx);
+		}
+
+		$ch = curl_init($this->host.'/api/sms/set-read');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == "OK");
+	}
+
+	public function deleteSms($idx) {
+		$req = new SimpleXMLElement('<request></request>');
+
+		if (is_array($idx)) {
+			for ($i = 0; $i < count($idx); $i++)
+					$req->addChild('Index', $idx[$i]);
+		} else {
+			$req->addChild('Index', $idx);
+		}
+
+		$ch = curl_init($this->host.'/api/sms/delete-sms');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == "OK");
+	}
+
+	public function sendSms($no, $message, $idx = -1) {
+		$req = new SimpleXMLElement('<request></request>');
+		$req->addChild('Index', $idx);
+		$ph = $req->addChild('Phones');
+		
+		if (is_array($no)) {
+			for ($i = 0; $i < count($no); $i++) {
+				$ph->addChild('Phone', $no[$i]);
+			}
+		} else {
+			$ph->addChild('Phone', $no);
+		}
+
+		$req->addChild('Sca');
+		$req->addChild('Content', $message);
+		$req->addChild('Length', strlen($message));
+		$req->addChild('Reserved', 1);
+		$req->addChild('Date', date('Y-m-d H:i:s'));
+
+		return true;  // backup return to prohibit high costs
+
+		$ch = curl_init($this->host.'/api/sms/send-sms');
+		$opts = array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => $req->asXML(),
+		);
+		curl_setopt_array($ch, $opts);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return ($res[0] == "OK");
+	}
+
+	public function sendSmsStatus() {
+		$ch = curl_init($this->host.'/api/sms/send-status');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		$ret = curl_exec($ch);
+		curl_close($ch);
+
+		$res = simplexml_load_string($ret);
+
+		return $res;
+	}
 
 
 	/* --- HELPER FUNCTIONS

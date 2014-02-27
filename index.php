@@ -1,6 +1,8 @@
 #!/usr/bin/env php
 <?php
 
+date_default_timezone_set('UTC');
+
 require_once __DIR__.'/hilink.class.php';
 
 $hilink = HiLink::create();
@@ -58,20 +60,34 @@ echo $hilink->getConnection();
 
 echo PHP_EOL;
 
-print_r($hilink->getApn());
-
-echo PHP_EOL;
-
 //print_r($hilink->createProfile('TestProfile', 'internet.eplus.de', 'eplus', 'internet')->asXML());
 echo $hilink->listApn();
 
+echo PHP_EOL;
+
+$no = '015253888828';
+
+//echo "Send SMS to $no: ".$hilink->sendSms($no, 'Testmessage').PHP_EOL;
 
 echo PHP_EOL;
 
+//print_r($hilink->getSmsCount());
 
+//print_r($hilink->sendSmsStatus());
 
+$hilink->printSmsBox();
 
+//$hilink->deleteProfile(2);
+//$hilink->deleteProfile(3);
 
+//echo "Set SMS 20001 read: ".$hilink->setSmsRead('20001').PHP_EOL;
 
+//print_r($hilink->listUnreadSms());
+
+//for ($i = 20000; $i < 20006; $i++) {
+//	echo "Delete $i: ".$hilink->deleteSms($i).PHP_EOL;
+//}
+
+//$hilink->printSmsBox();
 
 ?>
