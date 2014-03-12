@@ -22,7 +22,7 @@ echo PHP_EOL;
 $hilink->printStatus().PHP_EOL;
 
 if ($hilink->getServiceStatus() == 'enter PIN') {
-	echo "Enter PIN: ".$hilink->pinEnter(2681).PHP_EOL;
+	echo "Enter PIN: ".$hilink->pinEnter(1234).PHP_EOL;
 	sleep(2);
 	$hilink->printStatus().PHP_EOL;
 }
@@ -65,7 +65,7 @@ echo $hilink->listApn();
 
 echo PHP_EOL;
 
-$no = '015253888828';
+$no = '0123456789012';
 
 //echo "Send SMS to $no: ".$hilink->sendSms($no, 'Testmessage').PHP_EOL;
 

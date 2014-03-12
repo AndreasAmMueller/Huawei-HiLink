@@ -4,7 +4,7 @@
  * hilink.class.php
  *
  * @author Andreas Mueller <webmaster@am-wd.de>
- * @package Huawei-HiLink
+ * @version 1.0-20140312
  *
  * @description
  * This class tries to fully control an UMTS Stick from Huawei
@@ -30,7 +30,7 @@ class HiLink {
 
 	public function __construct() {
 		$this->setHost('192.168.1.1');
-		$this->setIpCheck('http://am-wd.de/ip.php');
+		$this->setIpCheck('http://dev.am-wd.de/ip.php');
 	}
 
 	// call default constructor
@@ -61,13 +61,13 @@ class HiLink {
 
 	// check if server (HiLink host) is reachable
 	public function online($server = '', $timeout = 1) {
-		if (empty($server)) 
+		if (empty($server))
 				$server = $this->host;
 
 		$sys = $this->getSystem();
 		switch ($sys) {
 			case "win":
-				$cmd = "ping -n 1 -w ".($timeout * 1000)." ".$server;
+				$cmd = "ping -n 1 -w ".($timeout * 100)." ".$server;
 				break;
 			case "mac":
 			$cmd = "ping -c 1 -t ".$timeout." ".$server." 2> /dev/null";
