@@ -4,7 +4,7 @@
  * hilink.class.php
  *
  * @author Andreas Mueller <webmaster@am-wd.de>
- * @version 1.0-20140312
+ * @version 1.0-20140703
  *
  * @description
  * This class tries to fully control an UMTS Stick from Huawei
@@ -80,7 +80,16 @@ class HiLink {
 		}
 		$res = exec($cmd, $out, $ret);
 
-		return ($ret == 0);
+		if ($ret == 0) {
+			$ch = curl_init('http://'.$server.'/html/index.html');
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+			$res = curl_exec($ch);
+			curl_close($ch);
+
+			return (strstr($res, 'hilink')) ? true : false;
+		}
+
+		return false;
 	}
 
 
@@ -197,7 +206,7 @@ class HiLink {
 	public function printTraffic() {
 		echo $this->getTraffic();
 	}
-	
+
 	public function resetTrafficStats() {
 		$ch = curl_init($this->host.'/api/monitoring/clear-traffic');
 		$opts = array(
@@ -208,7 +217,7 @@ class HiLink {
 		curl_setopt_array($ch, $opts);
 		$ret = curl_exec($ch);
 		curl_close($ch);
-		
+
 		$res = simplexml_load_string($ret);
 		return ($res[0] == "OK");
 	}
@@ -236,7 +245,7 @@ class HiLink {
 		if (isset($monitor->UpdateTime) && ($monitor->UpdateTime + 3) > time()) {
 			return $monitor;
 		}
-		
+
 		$ch = curl_init($this->host.'/api/monitoring/status');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		$res = curl_exec($ch);
@@ -616,7 +625,7 @@ class HiLink {
 		if (isset($device->UpdateTime) && ($device->UpdateTime + 3) > time()) {
 			return $device;
 		}
-		
+
 		$ch = curl_init($this->host.'/api/device/information');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		$res = curl_exec($ch);
@@ -734,8 +743,8 @@ class HiLink {
 		return simplexml_load_string($ret);
 	}
 
-	public function createProfile($name, $apn, $user, $password, 
-			$isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0, 
+	public function createProfile($name, $apn, $user, $password,
+			$isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0,
 			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
 		$req = new SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', 0);
@@ -772,8 +781,8 @@ class HiLink {
 		return ($res[0] == "OK");
 	}
 
-	public function editProfile($idx, $name, $apn, $user, $password, 
-			$readOnly = 0, $isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0, 
+	public function editProfile($idx, $name, $apn, $user, $password,
+			$readOnly = 0, $isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0,
 			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
 		$req = new SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', 0);
@@ -1081,7 +1090,7 @@ class HiLink {
 		$req = new SimpleXMLElement('<request></request>');
 		$req->addChild('Index', $idx);
 		$ph = $req->addChild('Phones');
-		
+
 		if (is_array($no)) {
 			for ($i = 0; $i < count($no); $i++) {
 				$ph->addChild('Phone', $no[$i]);
