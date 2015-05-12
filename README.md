@@ -10,7 +10,10 @@ Here I try to provide an PHP Class to control an UMTS Stick from Huawei with its
 - RaspberryPi Typ B (as server module)
 - Firebug <- Thanks! To catch all these crazy POST Statements...
 
-## Known Bugs
+## Bugs / Issues
+Please report bugs to [Issues | AM.WD / HiLink-Control](https://git.am-wd.de/AM.WD/HiLink-Control/issues)
+
+## Known Bugs (not fixed in near future)
 - Missing command to switch modes
 - No possibility to access in alternate mode
 
@@ -19,6 +22,7 @@ Here I try to provide an PHP Class to control an UMTS Stick from Huawei with its
 - [Raspberry Pi - via UMTS ins Netz](http://www.henrykoch.de/raspberry-pi-via-umts-ins-netz)
 - Some lonely nights programming
 
------------------
-### LICENESE
-My scripts are published under [MIT License](http://opensource.org/licenses/MIT).
+-----
+
+### LICENSE
+My scripts are published under [MIT License](https://am-wd.de/?p=about#license).
