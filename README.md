@@ -11,7 +11,7 @@ Here I try to provide an PHP Class to control an UMTS Stick from Huawei with its
 - Firebug <- Thanks! To catch all these crazy POST Statements...
 
 ## Bugs / Issues
-Please report bugs to [Issues | AM.WD / HiLink-Control](https://git.am-wd.de/AM.WD/HiLink-Control/issues)
+Please report bugs to [Bitbucket | Issues](https://bitbucket.org/BlackyPanther/huawei-hilink/issues)
 
 ## Known Bugs (not fixed in near future)
 - Missing command to switch modes

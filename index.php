@@ -5,7 +5,7 @@ date_default_timezone_set('UTC');
 
 require_once __DIR__.'/hilink.class.php';
 
-$hilink = HiLink::create();
+$hilink = AMWD\HiLink::create();
 
 echo "Host: ".$hilink->getHost().PHP_EOL;
 echo "Online: ".$hilink->online().PHP_EOL;

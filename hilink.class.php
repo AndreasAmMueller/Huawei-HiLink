@@ -13,6 +13,7 @@
  * functionality tested with Huawei E303
  * Link: http://www.huaweidevices.de/e303
  **/
+namespace AMWD;
 
 @error_reporting(0);
 
