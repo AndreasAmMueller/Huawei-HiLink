@@ -302,7 +302,7 @@ class HiLink {
 	}
 	public function setConnectionType($type = 'auto', $band = '-1599903692') {
 		$type = strtolower($type);
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		switch ($type) {
 			case '2g': $req->addChild('NetworkMode', 1); break;
 			case '3g': $req->addChild('NetworkMode', 2); break;
@@ -408,7 +408,7 @@ class HiLink {
 	}
 
 	private function pinDo($type, $pin, $new = '', $puk = '') {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('OperateType', $type);
 		$req->addChild('CurrentPin', $pin);
 		$req->addChild('NewPin', $new);
@@ -554,7 +554,7 @@ class HiLink {
 	}
 
 	private function doConnection($autoconnect, $reconnect, $roamingauto, $roamingre, $interval = 3, $idle = 0) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('RoamAutoConnectEnable', $roamingauto);
 		$req->addChild('AutoReconnect', $reconnect);
 		$req->addChild('RoamAutoReconnctEnable', $roamingre);
@@ -747,7 +747,7 @@ class HiLink {
 	public function createProfile($name, $apn, $user, $password,
 			$isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0,
 			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
-		$req = new SimpleXMLElement('<request></request>');
+		$resq = new \SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', 0);
 		$req->addChild('SetDefault', 0);
 		$req->addChild('Modify', 1);
@@ -785,7 +785,7 @@ class HiLink {
 	public function editProfile($idx, $name, $apn, $user, $password,
 			$readOnly = 0, $isValid = 1, $apnIsStatic = 1, $dailupNum = '*99#', $authMode = 0,
 			$ipIsStatic = 0, $ipAddress = '0.0.0.0', $dnsIsStatic = '', $primaryDns = '', $secondaryDns = '') {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', 0);
 		$req->addChild('SetDefault', $idx);
 		$req->addChild('Modify', 2);
@@ -821,7 +821,7 @@ class HiLink {
 	}
 
 	public function setProfileDefault($idx) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', 0);
 		$req->addChild('SetDefault', $idx);
 		$req->addChild('Modify', 0);
@@ -841,7 +841,7 @@ class HiLink {
 	}
 
 	public function deleteProfile($idx) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('Delete', $idx);
 		$req->addChild('SetDefault', 1);
 		$req->addChild('Modify', 0);
@@ -894,7 +894,7 @@ class HiLink {
 	/* --- SMS
 	---------- */
 	public function getSms($box = 1, $site = 1, $prefUnread = 0, $count = 20) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('PageIndex', $site);
 		$req->addChild('ReadCount', $count);
 		$req->addChild('BoxType', $box);
@@ -1038,7 +1038,7 @@ class HiLink {
 	}
 
 	public function setSmsRead($idx) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 
 		if (is_array($idx)) {
 			for ($i = 0; $i < count($idx); $i++)
@@ -1063,7 +1063,7 @@ class HiLink {
 	}
 
 	public function deleteSms($idx) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 
 		if (is_array($idx)) {
 			for ($i = 0; $i < count($idx); $i++)
@@ -1088,7 +1088,7 @@ class HiLink {
 	}
 
 	public function sendSms($no, $message, $idx = -1) {
-		$req = new SimpleXMLElement('<request></request>');
+		$req = new \SimpleXMLElement('<request></request>');
 		$req->addChild('Index', $idx);
 		$ph = $req->addChild('Phones');
 
